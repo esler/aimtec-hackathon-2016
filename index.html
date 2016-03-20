@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>[TODO]</title>
+    <script src="https://cdn.firebase.com/js/client/2.4.1/firebase.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.16/d3.min.js" charset="utf-8"></script>
+    <style type="text/css">
+        .client {
+            border: 1px solid red;
+            padding: 5px;
+        }
+    </style>
+</head>
+<body>
+<button onclick="add_pusher()">Add pusher</button>
+<script type="text/javascript">
+    var db = new Firebase("https://boiling-torch-5046.firebaseio.com/");
+
+    var mils = d3.format(".1f");
+    var prev = {};
+
+    function add_pusher() {
+        update(Math.random().toString(36).substring(7));
+    }
+
+    function update(client_name) {
+        db.child("clients/" + client_name).set({microtime: Date.now() * 1000}, function () {
+            update(client_name);
+        });
+    }
+
+    function render(snapshot) {
+        var data = _.map(snapshot.val(), function (payload, name) {
+            var delay, mps = NaN;
+
+            if (prev[name]) {
+                delay = payload.microtime - prev[name].microtime;
+                mps   = 1000000.0 / delay
+            }
+
+            prev[name] = payload;
+
+            return {
+                name:  name,
+                delay: delay / 1000.0,
+                mps:   mps
+            };
+        });
+
+        // create box for each client
+        var client = d3.select("body")
+            .selectAll("div.client")
+            .data(data);
+
+        var div = client.enter().append('div').attr("class", "client");
+        div.append('h2');
+        div.append('p').attr("class", "delay");
+        div.append('p').attr("class", "mps");
+
+        client.exit().remove();
+
+        client.select('h2').text(function (d) {return d.name;});
+        client.select('p.delay').text(function (d) {return "delay: " + mils(d.delay) + "ms"; });
+        client.select('p.mps').text(function (d) {return "mps: " + mils(d.mps) + " msg/s"; });
+    }
+
+    db.child("clients").on("value", render);
+</script>
+</body>
+</html>
